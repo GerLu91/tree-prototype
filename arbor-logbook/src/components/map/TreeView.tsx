@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { 
   MapPin, Ruler, Activity, ClipboardCheck, Navigation, 
   CheckCircle2, Filter, AlertTriangle, AlertCircle, Wrench, Plus, 
-  Route, ListPlus
+  Route, ListPlus, ArrowUp, ArrowDown, Trash2, CalendarPlus
 } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -96,16 +96,18 @@ interface TreeViewProps {
   trees: Tree[];
   onAddTree: (tree: Tree) => void;
   tasks: MaintenanceTask[];
-  onAddTask: (task: any) => void;
+  onAddTask: (task: MaintenanceTask) => void;
   initialSelectedId: string | null;
   onClearSelection: () => void;
   tour: string[];
   onToggleTourTree: (id: string) => void;
+  onReorderTour: (newOrder: string[]) => void;
+  onCompleteTask: (task: MaintenanceTask) => void;
 }
 
 export function TreeView({ 
-  trees, onAddTree, tasks, onAddTask, initialSelectedId, onClearSelection,
-  tour, onToggleTourTree 
+  trees, onAddTree, tasks, onAddTask,onCompleteTask, initialSelectedId, onClearSelection,
+  tour, onToggleTourTree, onReorderTour 
 }: TreeViewProps) {
   const [selectedTree, setSelectedTree] = useState<Tree | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -117,14 +119,12 @@ export function TreeView({
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 49.4521, lng: 11.0767 });
 
-  // NEU: Tour-Modus State
   const [isTourMode, setIsTourMode] = useState(false);
 
   const treeTasks = useMemo(() => {
     return tasks.filter(t => t.treeId === selectedTree?.id);
   }, [tasks, selectedTree]);
 
-  // NEU: Berechnung der Tour-Linie
   const tourCoords = useMemo(() => {
     if (tour.length === 0) return null;
     const coords: [number, number][] = [TEAM_POSITION];
@@ -136,8 +136,23 @@ export function TreeView({
   }, [tour, trees]);
 
   const handleStartNavigation = (tree: Tree) => {
-    setIsTourMode(false); // Navigation beendet Tour-Planung-Sicht
+    setIsTourMode(false); 
     setRouteCoords([TEAM_POSITION, [tree.location.lat, tree.location.lng]]);
+  };
+
+  const handleQuickPlan = (type: MaintenanceTask['type']) => {
+    if (!selectedTree) return;
+    
+    const newTask: MaintenanceTask = {
+      id: crypto.randomUUID(),
+      treeId: selectedTree.id,
+      type: type,
+      status: 'offen',
+      priority: selectedTree.status === 'critical' ? 'hoch' : 'mittel',
+      dueDate: new Date().toISOString(),
+    };
+    
+    onAddTask(newTask);
   };
 
   const filteredTrees = useMemo(() => {
@@ -209,7 +224,7 @@ export function TreeView({
 
       {/* TOUR STATUS BADGE */}
       {isTourMode && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[500] pointer-events-none">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[500] pointer-events-none text-slate-900">
           <Badge className="bg-blue-600 text-white px-4 py-2 shadow-xl border-none flex gap-2 items-center animate-in slide-in-from-top-4">
             <ListPlus size={14} />
             <span className="uppercase font-black text-[10px] tracking-widest">Planung: {tour.length} Stopps</span>
@@ -282,7 +297,12 @@ export function TreeView({
               eventHandlers={{ 
                 click: () => { 
                   if (isTourMode) {
-                    onToggleTourTree(tree.id);
+                    if (isInTour) {
+                      setSelectedTree(tree);
+                      setIsFormOpen(false);
+                    } else {
+                      onToggleTourTree(tree.id);
+                    }
                   } else {
                     setSelectedTree(tree); 
                     setIsFormOpen(false); 
@@ -305,7 +325,6 @@ export function TreeView({
           })} 
         />
 
-        {/* TOUR LINIE */}
         {isTourMode && tourCoords && (
           <Polyline 
             positions={tourCoords} 
@@ -313,7 +332,6 @@ export function TreeView({
           />
         )}
 
-        {/* EINZEL-NAVIGATION LINIE */}
         {!isTourMode && routeCoords && (
           <Polyline 
             positions={routeCoords} 
@@ -372,6 +390,58 @@ export function TreeView({
                     </Badge>
                   </div>
                 </SheetHeader>
+
+                {/* TOUR-STEUERUNG IM SHEET */}
+                {isTourMode && tour.includes(selectedTree.id) && (
+                  <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                        <Route size={12} /> Stopp #{tour.indexOf(selectedTree.id) + 1}
+                      </span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-red-600 hover:bg-red-50 font-bold text-[10px] uppercase p-0 px-2"
+                        onClick={() => {
+                          onToggleTourTree(selectedTree.id);
+                          setSelectedTree(null);
+                        }}
+                      >
+                        <Trash2 size={12} className="mr-1" /> Entfernen
+                      </Button>
+                    </div>
+                    
+                    <div className="flex gap-2 text-slate-900">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 h-10 bg-white border-blue-200 text-blue-600"
+                        disabled={tour.indexOf(selectedTree.id) === 0}
+                        onClick={() => {
+                          const idx = tour.indexOf(selectedTree.id);
+                          const newTour = [...tour];
+                          [newTour[idx], newTour[idx-1]] = [newTour[idx-1], newTour[idx]];
+                          onReorderTour(newTour);
+                        }}
+                      >
+                        <ArrowUp size={16} />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 h-10 bg-white border-blue-200 text-blue-600"
+                        disabled={tour.indexOf(selectedTree.id) === tour.length - 1}
+                        onClick={() => {
+                          const idx = tour.indexOf(selectedTree.id);
+                          const newTour = [...tour];
+                          [newTour[idx], newTour[idx+1]] = [newTour[idx+1], newTour[idx]];
+                          onReorderTour(newTour);
+                        }}
+                      >
+                        <ArrowDown size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-slate-50 p-3 rounded-xl flex items-center gap-3 border border-slate-100 text-slate-900">
                     <div className="text-primary bg-primary/10 p-2 rounded-lg"><Ruler size={18} /></div>
@@ -388,17 +458,37 @@ export function TreeView({
                     </div>
                   </div>
                 </div>
+
+                {/* NEU: SCHNELL-PLANUNG */}
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                    <CalendarPlus size={12} /> Schnell-Planung
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {['Kronenpflege', 'Kontrolle', 'Totholz entfernen'].map((type) => (
+                      <Button 
+                        key={type}
+                        variant="outline" 
+                        className="h-8 text-[9px] font-black uppercase border-slate-200 rounded-lg px-3 bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
+                        onClick={() => handleQuickPlan(type as any)}
+                      >
+                        + {type}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                     <ClipboardCheck size={12} /> Historie
                   </h4>
-                  <div className="space-y-3 max-h-[160px] overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-[120px] overflow-y-auto pr-1 text-slate-900">
                     {treeTasks.length > 0 ? (
                         treeTasks.map(task => (
-                            <div key={task.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm space-y-1">
-                                <div className="flex justify-between items-center text-slate-900">
-                                    <span className="font-black text-slate-800 text-[11px] uppercase tracking-tight">{task.type}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 tracking-tighter">{new Date(task.dueDate).toLocaleDateString('de-DE')}</span>
+                            <div key={task.id} className={`p-3 rounded-xl border shadow-sm space-y-1 ${task.status === 'erledigt' ? 'bg-slate-50 border-slate-100' : 'bg-blue-50 border-blue-100'}`}>
+                                <div className="flex justify-between items-center">
+                                    <span className="font-black text-slate-800 text-[10px] uppercase tracking-tight">{task.type}</span>
+                                    <Badge variant="outline" className="text-[8px] font-bold py-0">{task.status}</Badge>
                                 </div>
                             </div>
                         ))
@@ -407,6 +497,7 @@ export function TreeView({
                     )}
                   </div>
                 </div>
+
                 <div className="grid grid-cols-5 gap-2 pt-2">
                   <Button 
                     variant="outline"
@@ -420,7 +511,7 @@ export function TreeView({
                     className="col-span-3 h-14 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/20"
                     onClick={() => setIsFormOpen(true)}
                   >
-                    Maßnahme
+                    Maßnahme starten
                   </Button>
                 </div>
               </div>

@@ -3,21 +3,18 @@ import { MainLayout } from "./components/layout/MainLayout";
 import { Dashboard } from "./components/features/Dashboard";
 import { TreeView } from "./components/map/TreeView";
 import { DailyLog } from "./components/features/DailyLog";
-import { TaskList } from "./components/features/TaskList"; // Sicherstellen, dass importiert
+import { TaskList } from "./components/features/TaskList";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { MOCK_TREES, MOCK_TASKS } from "./mock/data";
 import type { MaintenanceTask, Tree } from "./types";
-import { CheckSquare } from "lucide-react";
 
 type TabType = 'start' | 'karte' | 'protokoll' | 'aufgaben';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('start');
   
-  // Persistente States via LocalStorage Hook
   const [trees, setTrees] = useLocalStorage<Tree[]>('arbor_trees', MOCK_TREES);
   const [tasks, setTasks] = useLocalStorage<MaintenanceTask[]>('arbor_tasks', MOCK_TASKS);
-
   const [tour, setTour] = useLocalStorage<string[]>('arbor_tour', []);
   
   const [targetTreeId, setTargetTreeId] = useState<string | null>(null);
@@ -27,47 +24,56 @@ function App() {
     setActiveTab('karte');
   };
 
-  // NEU: Funktion zum Hinzufügen eines Baums
+  // 1. NEUEN BAUM ANLEGEN
   const addTree = (newTree: Tree) => {
     setTrees(prev => [...prev, newTree]);
   };
 
+  // 2. MASSNAHME PLANEN (Quick-Add oder Büro)
   const addTask = (newTask: MaintenanceTask) => {
     setTasks(prev => [newTask, ...prev]);
+    // Der Baumstatus bleibt hier wie er ist (z.B. kritisch), 
+    // damit er auf der Karte weiterhin als "zu tun" markiert ist.
+  };
+
+  // 3. MASSNAHME ABSCHLIESSEN (Dokumentation im Feld)
+  const completeTask = (newTask: MaintenanceTask) => {
+    // Falls ein bestehender Task überschrieben wird (ID check) oder neu
+    setTasks(prev => {
+      const exists = prev.find(t => t.id === newTask.id);
+      if (exists) {
+        return prev.map(t => t.id === newTask.id ? newTask : t);
+      }
+      return [newTask, ...prev];
+    });
     
-    // Den Status des Baums aktualisieren, wenn eine Maßnahme durchgeführt wurde
+    // Baum wieder auf 'healthy' setzen
     setTrees(prevTrees => prevTrees.map(t => 
       t.id === newTask.treeId ? { ...t, status: 'healthy' as const } : t
     ));
-  };
 
-  const handleReset = () => {
-    if (window.confirm("Alle Daten zurücksetzen?")) {
-      localStorage.removeItem('arbor_trees');
-      localStorage.removeItem('arbor_tasks');
-      window.location.reload();
-    }
+    // Aus der Tour entfernen
+    setTour(prevTour => prevTour.filter(id => id !== newTask.treeId));
   };
 
   const toggleTourTree = (treeId: string) => {
-    setTour(prev => {
-      if (prev.includes(treeId)) {
-        return prev.filter(id => id !== treeId);
-      } else {
-        return [...prev, treeId];
-      }
-    });
+    setTour(prev => prev.includes(treeId) ? prev.filter(id => id !== treeId) : [...prev, treeId]);
   };
 
-  const reorderTour = (newOrder: string[]) => {
-    setTour(newOrder);
+  const reorderTour = (newOrder: string[]) => setTour(newOrder);
+
+  const handleReset = () => {
+    if (window.confirm("Alle Daten zurücksetzen?")) {
+      localStorage.clear();
+      window.location.reload();
+    }
   };
 
   return (
     <MainLayout activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === 'start' && (
         <Dashboard 
-          onStartTour={() => setActiveTab('karte')} 
+          onStartTour={() => setActiveTab('aufgaben')} 
           onSelectTree={handleSelectTree} 
           tasks={tasks}
           trees={trees} 
@@ -78,13 +84,15 @@ function App() {
       {activeTab === 'karte' && (
         <TreeView 
           trees={trees} 
-          onAddTree={addTree} // <--- HIER war die fehlende Verbindung!
+          onAddTree={addTree}
           tasks={tasks} 
           onAddTask={addTask} 
-          initialSelectedId={targetTreeId}
-          onClearSelection={() => setTargetTreeId(null)} 
+          onCompleteTask={completeTask}
           tour={tour}
           onToggleTourTree={toggleTourTree}
+          onReorderTour={reorderTour}
+          initialSelectedId={targetTreeId}
+          onClearSelection={() => setTargetTreeId(null)} 
         />
       )}
 
@@ -94,13 +102,13 @@ function App() {
 
       {activeTab === 'aufgaben' && (
         <TaskList 
-    tasks={tasks} 
-    trees={trees} 
-    onSelectTree={handleSelectTree}
-    tour={tour}
-    onReorderTour={reorderTour}
-    onToggleTourTree={toggleTourTree}
-  />
+          tasks={tasks} 
+          trees={trees} 
+          onSelectTree={handleSelectTree}
+          tour={tour}
+          onReorderTour={reorderTour}
+          onToggleTourTree={toggleTourTree}
+        />
       )}
     </MainLayout>
   );
