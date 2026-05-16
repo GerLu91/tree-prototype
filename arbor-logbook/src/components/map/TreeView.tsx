@@ -359,7 +359,7 @@ export function TreeView({
       )}
 
       {/* Legende */}
-      <div className="absolute bottom-20 left-4 right-4 bg-white/95 backdrop-blur-sm p-3 rounded-2xl shadow-2xl border border-slate-100 flex justify-between items-center z-[490]">
+      <div className="absolute bottom-5 left-4 right-4 bg-white/95 backdrop-blur-sm p-3 rounded-2xl shadow-2xl border border-slate-100 flex justify-between items-center z-[490]">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-full bg-emerald-600 shadow-sm"></span>
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Vital</span>
