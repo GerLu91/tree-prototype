@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button';
 import { MaintenanceForm } from '@/components/forms/MaintenanceForm';
 import { AddTreeForm } from '@/components/forms/AddTreeForm';
 import type { MaintenanceTask, Tree } from '@/types';
+
+// Asset Handling für Leaflet
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -25,10 +27,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-
 const TEAM_POSITION: [number, number] = [49.4505, 11.0820]; 
 
-// Hilfskomponente für Kamera-Flug
+// --- HILFSKOMPONENTEN ---
+
 function MapFocusHandler({ target }: { target: [number, number] | null }) {
   const map = useMap();
   useEffect(() => {
@@ -39,7 +41,6 @@ function MapFocusHandler({ target }: { target: [number, number] | null }) {
   return null;
 }
 
-// Hilfskomponente zum automatischen Anpassen des Kartenausschnitts
 function MapBoundsHandler({ trees }: { trees: Tree[] }) {
   const map = useMap();
   useEffect(() => {
@@ -51,7 +52,6 @@ function MapBoundsHandler({ trees }: { trees: Tree[] }) {
   return null;
 }
 
-// Tracker für die Kartenmitte (für die Ad-hoc Erfassung)
 function MapCenterTracker({ onCenterChange }: { onCenterChange: (coords: {lat: number, lng: number}) => void }) {
   useMapEvents({
     moveend: (e) => {
@@ -61,6 +61,8 @@ function MapCenterTracker({ onCenterChange }: { onCenterChange: (coords: {lat: n
   });
   return null;
 }
+
+// --- ICON GENERATOREN ---
 
 const createCustomIcon = (status: string, idNumber: string) => {
   const color = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#059669';
@@ -77,7 +79,6 @@ const createCustomIcon = (status: string, idNumber: string) => {
   return L.divIcon({ html, className: 'custom-tree-icon', iconSize: [40, 40], iconAnchor: [20, 40] });
 };
 
-// Spezielles Icon für Tour-Stopps
 const createTourIcon = (index: number) => {
   const html = renderToStaticMarkup(
     <div className="relative flex flex-col items-center scale-110">
@@ -92,21 +93,23 @@ const createTourIcon = (index: number) => {
   return L.divIcon({ html, className: 'tour-marker-icon', iconSize: [40, 40], iconAnchor: [20, 40] });
 };
 
+// --- HAUPTKOMPONENTE ---
+
 interface TreeViewProps {
   trees: Tree[];
   onAddTree: (tree: Tree) => void;
   tasks: MaintenanceTask[];
   onAddTask: (task: MaintenanceTask) => void;
+  onCompleteTask: (task: MaintenanceTask) => void;
   initialSelectedId: string | null;
   onClearSelection: () => void;
   tour: string[];
   onToggleTourTree: (id: string) => void;
   onReorderTour: (newOrder: string[]) => void;
-  onCompleteTask: (task: MaintenanceTask) => void;
 }
 
 export function TreeView({ 
-  trees, onAddTree, tasks, onAddTask,onCompleteTask, initialSelectedId, onClearSelection,
+  trees, onAddTree, tasks, onAddTask, onCompleteTask, initialSelectedId, onClearSelection,
   tour, onToggleTourTree, onReorderTour 
 }: TreeViewProps) {
   const [selectedTree, setSelectedTree] = useState<Tree | null>(null);
@@ -118,8 +121,13 @@ export function TreeView({
   const [isAddingMode, setIsAddingMode] = useState(false);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 49.4521, lng: 11.0767 });
-
   const [isTourMode, setIsTourMode] = useState(false);
+
+  // NEU: Logik zur Erkennung eines geplanten Tasks für das Formular
+  const activeTask = useMemo(() => {
+    if (!selectedTree) return undefined;
+    return tasks.find(t => t.treeId === selectedTree.id && t.status === 'offen');
+  }, [tasks, selectedTree]);
 
   const treeTasks = useMemo(() => {
     return tasks.filter(t => t.treeId === selectedTree?.id);
@@ -142,7 +150,6 @@ export function TreeView({
 
   const handleQuickPlan = (type: MaintenanceTask['type']) => {
     if (!selectedTree) return;
-    
     const newTask: MaintenanceTask = {
       id: crypto.randomUUID(),
       treeId: selectedTree.id,
@@ -151,7 +158,6 @@ export function TreeView({
       priority: selectedTree.status === 'critical' ? 'hoch' : 'mittel',
       dueDate: new Date().toISOString(),
     };
-    
     onAddTask(newTask);
   };
 
@@ -167,7 +173,6 @@ export function TreeView({
     { id: 'healthy', label: 'Vital', color: 'bg-emerald-600', icon: CheckCircle2 },
     { id: 'warning', label: 'Warnung', color: 'bg-yellow-500', icon: AlertTriangle },
     { id: 'critical', label: 'Kritisch', color: 'bg-red-500', icon: AlertCircle },
-    { id: 'maintenance', label: 'Maßnahme', color: 'bg-blue-500', icon: Wrench },
   ];
 
   useEffect(() => {
@@ -212,9 +217,7 @@ export function TreeView({
           <button 
             onClick={() => setIsTourMode(!isTourMode)}
             className={`p-4 rounded-2xl shadow-2xl transition-all border-2 active:scale-95 ${
-              isTourMode 
-                ? 'bg-blue-600 text-white border-blue-400' 
-                : 'bg-white text-slate-600 border-slate-100'
+              isTourMode ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-slate-600 border-slate-100'
             }`}
           >
             <Route size={24} strokeWidth={isTourMode ? 3 : 2} />
@@ -243,7 +246,7 @@ export function TreeView({
         </button>
       )}
 
-      {/* FADENKREUZ */}
+      {/* FADENKREUZ (Add Mode) */}
       {isAddingMode && (
         <>
           <div className="absolute inset-0 z-[499] pointer-events-none flex items-center justify-center">
@@ -257,18 +260,11 @@ export function TreeView({
           <div className="absolute bottom-28 left-4 right-4 z-[500] flex flex-col gap-2">
              <Button 
                className="w-full h-16 rounded-2xl shadow-2xl bg-emerald-600 text-lg font-black uppercase"
-               onClick={() => {
-                 setIsAddingMode(false);
-                 setIsAddSheetOpen(true);
-               }}
+               onClick={() => { setIsAddingMode(false); setIsAddSheetOpen(true); }}
              >
                Position bestätigen
              </Button>
-             <Button 
-               variant="secondary"
-               className="w-full h-12 rounded-xl bg-white/90 font-bold uppercase text-xs"
-               onClick={() => setIsAddingMode(false)}
-             >
+             <Button variant="secondary" className="w-full h-12 rounded-xl bg-white/90 font-bold uppercase text-xs" onClick={() => setIsAddingMode(false)}>
                Abbrechen
              </Button>
           </div>
@@ -276,10 +272,7 @@ export function TreeView({
       )}
 
       <MapContainer center={TEAM_POSITION} zoom={16} style={{ width: '100%', height: '100%' }} zoomControl={false}>
-        <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        />
+        <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
 
         {isAddingMode && <MapCenterTracker onCenterChange={setMapCenter} />}
         {activeFilter !== 'all' && <MapBoundsHandler trees={filteredTrees} />}
@@ -288,7 +281,6 @@ export function TreeView({
         {filteredTrees.map((tree) => {
           const tourIndex = tour.indexOf(tree.id);
           const isInTour = tourIndex !== -1;
-
           return (
             <Marker 
               key={tree.id} 
@@ -297,15 +289,10 @@ export function TreeView({
               eventHandlers={{ 
                 click: () => { 
                   if (isTourMode) {
-                    if (isInTour) {
-                      setSelectedTree(tree);
-                      setIsFormOpen(false);
-                    } else {
-                      onToggleTourTree(tree.id);
-                    }
+                    if (isInTour) { setSelectedTree(tree); setIsFormOpen(false); } 
+                    else { onToggleTourTree(tree.id); }
                   } else {
-                    setSelectedTree(tree); 
-                    setIsFormOpen(false); 
+                    setSelectedTree(tree); setIsFormOpen(false); 
                   }
                 } 
               }}
@@ -313,46 +300,20 @@ export function TreeView({
           );
         })}
 
-        <Marker 
-          position={TEAM_POSITION} 
-          icon={L.divIcon({ 
-            html: renderToStaticMarkup(
-              <div className="bg-blue-600 p-2 rounded-full border-2 border-white shadow-lg text-white">
-                <Navigation size={16} fill="currentColor" /> 
-              </div>
-            ),
-            className: 'team-icon'
-          })} 
-        />
+        <Marker position={TEAM_POSITION} icon={L.divIcon({ 
+          html: renderToStaticMarkup(<div className="bg-blue-600 p-2 rounded-full border-2 border-white shadow-lg text-white"><Navigation size={16} fill="currentColor" /></div>),
+          className: 'team-icon'
+        })} />
 
-        {isTourMode && tourCoords && (
-          <Polyline 
-            positions={tourCoords} 
-            pathOptions={{ color: '#2563eb', weight: 4, dashArray: '1, 10', opacity: 0.7 }} 
-          />
-        )}
-
-        {!isTourMode && routeCoords && (
-          <Polyline 
-            positions={routeCoords} 
-            pathOptions={{ color: '#3b82f6', weight: 4, dashArray: '10, 10', opacity: 0.6 }} 
-          />
-        )}
+        {isTourMode && tourCoords && <Polyline positions={tourCoords} pathOptions={{ color: '#2563eb', weight: 4, dashArray: '1, 10', opacity: 0.7 }} />}
+        {!isTourMode && routeCoords && <Polyline positions={routeCoords} pathOptions={{ color: '#3b82f6', weight: 4, dashArray: '10, 10', opacity: 0.6 }} />}
       </MapContainer>
 
       {/* Navigations-Overlay Badge */}
       {routeCoords && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] flex flex-col items-center gap-2">
-          <Badge className="bg-blue-600 text-white px-4 py-1.5 shadow-xl border-none animate-pulse">
-            Navigation aktiv
-          </Badge>
-          <Button 
-            variant="secondary" 
-            className="bg-white/90 shadow-md h-7 px-3 text-[10px] font-black uppercase rounded-full"
-            onClick={() => setRouteCoords(null)}
-          >
-            Abbrechen
-          </Button>
+          <Badge className="bg-blue-600 text-white px-4 py-1.5 shadow-xl border-none animate-pulse">Navigation aktiv</Badge>
+          <Button variant="secondary" className="bg-white/90 shadow-md h-7 px-3 text-[10px] font-black uppercase rounded-full" onClick={() => setRouteCoords(null)}>Abbrechen</Button>
         </div>
       )}
 
@@ -385,57 +346,36 @@ export function TreeView({
                       <SheetTitle className="text-2xl">{selectedTree.species}</SheetTitle>
                       <p className="text-sm text-slate-400 italic">{selectedTree.latinName}</p>
                     </div>
-                    <Badge variant={selectedTree.status === 'critical' ? 'destructive' : 'secondary'}>
-                      {selectedTree.status.toUpperCase()}
-                    </Badge>
+                    <Badge variant={selectedTree.status === 'critical' ? 'destructive' : 'secondary'}>{selectedTree.status.toUpperCase()}</Badge>
                   </div>
                 </SheetHeader>
 
                 {/* TOUR-STEUERUNG IM SHEET */}
                 {isTourMode && tour.includes(selectedTree.id) && (
                   <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-3">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center text-slate-900">
                       <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
                         <Route size={12} /> Stopp #{tour.indexOf(selectedTree.id) + 1}
                       </span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 text-red-600 hover:bg-red-50 font-bold text-[10px] uppercase p-0 px-2"
-                        onClick={() => {
-                          onToggleTourTree(selectedTree.id);
-                          setSelectedTree(null);
-                        }}
-                      >
+                      <Button variant="ghost" size="sm" className="h-7 text-red-600 hover:bg-red-50 font-bold text-[10px] uppercase p-0 px-2" onClick={() => { onToggleTourTree(selectedTree.id); setSelectedTree(null); }}>
                         <Trash2 size={12} className="mr-1" /> Entfernen
                       </Button>
                     </div>
-                    
-                    <div className="flex gap-2 text-slate-900">
-                      <Button 
-                        variant="outline" 
-                        className="flex-1 h-10 bg-white border-blue-200 text-blue-600"
-                        disabled={tour.indexOf(selectedTree.id) === 0}
-                        onClick={() => {
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1 h-10 bg-white border-blue-200 text-blue-600" disabled={tour.indexOf(selectedTree.id) === 0} onClick={() => {
                           const idx = tour.indexOf(selectedTree.id);
                           const newTour = [...tour];
                           [newTour[idx], newTour[idx-1]] = [newTour[idx-1], newTour[idx]];
                           onReorderTour(newTour);
-                        }}
-                      >
+                        }}>
                         <ArrowUp size={16} />
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1 h-10 bg-white border-blue-200 text-blue-600"
-                        disabled={tour.indexOf(selectedTree.id) === tour.length - 1}
-                        onClick={() => {
+                      <Button variant="outline" className="flex-1 h-10 bg-white border-blue-200 text-blue-600" disabled={tour.indexOf(selectedTree.id) === tour.length - 1} onClick={() => {
                           const idx = tour.indexOf(selectedTree.id);
                           const newTour = [...tour];
                           [newTour[idx], newTour[idx+1]] = [newTour[idx+1], newTour[idx]];
                           onReorderTour(newTour);
-                        }}
-                      >
+                        }}>
                         <ArrowDown size={16} />
                       </Button>
                     </div>
@@ -459,29 +399,21 @@ export function TreeView({
                   </div>
                 </div>
 
-                {/* NEU: SCHNELL-PLANUNG */}
+                {/* SCHNELL-PLANUNG */}
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <CalendarPlus size={12} /> Schnell-Planung
-                  </h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><CalendarPlus size={12} /> Schnell-Planung</h4>
                   <div className="flex flex-wrap gap-2">
                     {['Kronenpflege', 'Kontrolle', 'Totholz entfernen'].map((type) => (
-                      <Button 
-                        key={type}
-                        variant="outline" 
-                        className="h-8 text-[9px] font-black uppercase border-slate-200 rounded-lg px-3 bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
-                        onClick={() => handleQuickPlan(type as any)}
-                      >
+                      <Button key={type} variant="outline" className="h-8 text-[9px] font-black uppercase border-slate-200 rounded-lg px-3 bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200" onClick={() => handleQuickPlan(type as any)}>
                         + {type}
                       </Button>
                     ))}
                   </div>
                 </div>
 
+                {/* HISTORIE */}
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <ClipboardCheck size={12} /> Historie
-                  </h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><ClipboardCheck size={12} /> Historie</h4>
                   <div className="space-y-3 max-h-[120px] overflow-y-auto pr-1 text-slate-900">
                     {treeTasks.length > 0 ? (
                         treeTasks.map(task => (
@@ -492,36 +424,29 @@ export function TreeView({
                                 </div>
                             </div>
                         ))
-                    ) : (
-                        <p className="text-[10px] text-slate-400 text-center py-2">Keine Historie</p>
-                    )}
+                    ) : ( <p className="text-[10px] text-slate-400 text-center py-2">Keine Historie</p> )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-5 gap-2 pt-2">
-                  <Button 
-                    variant="outline"
-                    className="col-span-2 h-14 rounded-2xl border-slate-200 flex flex-col gap-1 items-center justify-center group text-slate-900"
-                    onClick={() => handleStartNavigation(selectedTree)}
-                  >
+                  <Button variant="outline" className="col-span-2 h-14 rounded-2xl border-slate-200 flex flex-col gap-1 items-center justify-center group text-slate-900" onClick={() => handleStartNavigation(selectedTree)}>
                     <Navigation size={18} className="text-blue-600 group-active:scale-110 transition-transform" />
                     <span className="text-[10px] font-black uppercase tracking-tighter">Anfahrt</span>
                   </Button>
-                  <Button 
-                    className="col-span-3 h-14 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/20"
-                    onClick={() => setIsFormOpen(true)}
-                  >
-                    Maßnahme starten
+                  <Button className="col-span-3 h-14 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/20 bg-emerald-600" onClick={() => setIsFormOpen(true)}>
+                    {activeTask ? 'Maßnahme fortführen' : 'Maßnahme starten'}
                   </Button>
                 </div>
               </div>
             ) : (
               <MaintenanceForm 
                 tree={selectedTree} 
+                existingTask={activeTask} // ÜBERGABE DES GEPLANTEN TASKS
                 onCancel={() => setIsFormOpen(false)} 
                 onSave={(newTask) => {
-                  onAddTask(newTask);
+                  onCompleteTask(newTask); // LOGIK-FIX: NUTZE COMPLETE STATT ADD
                   setIsFormOpen(false);
+                  setSelectedTree(null);
                 }} 
               />
             )
@@ -529,18 +454,9 @@ export function TreeView({
         </SheetContent>
       </Sheet>
 
-      {/* SHEET FÜR AD-HOC ERFASSUNG */}
       <Sheet open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
         <SheetContent>
-          <AddTreeForm 
-            coords={mapCenter} 
-            onCancel={() => setIsAddSheetOpen(false)}
-            onSave={(newTree) => {
-              onAddTree(newTree);
-              setIsAddSheetOpen(false);
-              setSelectedTree(newTree);
-            }}
-          />
+          <AddTreeForm coords={mapCenter} onCancel={() => setIsAddSheetOpen(false)} onSave={(newTree) => { onAddTree(newTree); setIsAddSheetOpen(false); setSelectedTree(newTree); }} />
         </SheetContent>
       </Sheet>
     </div>
