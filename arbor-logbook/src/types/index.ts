@@ -32,3 +32,11 @@ export interface MaintenanceTask {
   woodChips?: string; // Optional, da erst beim Abschluss gefüllt
   image?: string;     // Optional, da erst beim Abschluss gefüllt
 }
+
+export interface DailyReport {
+  id: string;
+  date: string;
+  tasks: MaintenanceTask[];
+  totalHours: number;
+  treeCount: number;
+}

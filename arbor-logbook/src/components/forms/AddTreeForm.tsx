@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { 
   TreeDeciduous, MapPin, Ruler, 
-  Activity, Info, AlertCircle 
+  Activity, Info 
 } from "lucide-react";
 
 export function AddTreeForm({ onSave, onCancel, coords }: { 

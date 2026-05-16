@@ -15,11 +15,15 @@ import { MaintenanceForm } from '@/components/forms/MaintenanceForm';
 import { AddTreeForm } from '@/components/forms/AddTreeForm';
 import type { MaintenanceTask, Tree } from '@/types';
 
-// Asset Handling für Leaflet
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+// Asset Handling für Leaflet mit Vite Suffix ?url (Wichtig für Build-Check)
+import markerIcon from 'leaflet/dist/images/marker-icon.png?url';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png?url';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png?url';
 
+import { InfoBox } from '../ui/infobox';
+import { useToast } from '../features/ToastContext';
+
+// Fix für die Default-Icons in Leaflet/Vite
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
@@ -62,35 +66,60 @@ function MapCenterTracker({ onCenterChange }: { onCenterChange: (coords: {lat: n
   return null;
 }
 
-// --- ICON GENERATOREN ---
+// --- ICON GENERATOREN (VEREDELT) ---
 
-const createCustomIcon = (status: string, idNumber: string) => {
+const createCustomIcon = (status: string, idNumber: string, hasOpenTask: boolean) => {
   const color = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#059669';
+  
   const html = renderToStaticMarkup(
     <div className="relative flex flex-col items-center">
-      <div style={{ backgroundColor: color }} className="p-1.5 rounded-full border-2 border-white shadow-xl text-white">
+      {/* Pulsierender Ring bei offenen Aufgaben (Smart Marker) */}
+      {hasOpenTask && (
+        <div className="absolute inset-0 -m-1 w-11 h-11 animate-marker-pulse bg-yellow-500/20 rounded-full z-0" />
+      )}
+      
+      <div style={{ backgroundColor: color }} className="relative p-1.5 rounded-full border-2 border-white shadow-xl text-white z-10">
         <MapPin size={18} />
+        
+        {/* Kleines Werkzeug-Badge am Marker */}
+        {hasOpenTask && (
+          <div className="absolute -top-1.5 -right-1.5 bg-white text-yellow-600 rounded-full p-0.5 shadow-xs border border-yellow-200">
+            <Wrench size={8} strokeWidth={3} />
+          </div>
+        )}
       </div>
-      <div className="bg-white/90 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-black mt-0.5 shadow-sm border border-slate-200 text-slate-800 whitespace-nowrap">
+
+      <div className="bg-white/90 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-black mt-0.5 shadow-sm border border-slate-200 text-slate-800 whitespace-nowrap z-10">
         {idNumber}
       </div>
     </div>
   );
-  return L.divIcon({ html, className: 'custom-tree-icon', iconSize: [40, 40], iconAnchor: [20, 40] });
+  return L.divIcon({ html, className: 'custom-tree-icon', iconSize: [44, 44], iconAnchor: [22, 40] });
 };
 
-const createTourIcon = (index: number) => {
+const createTourIcon = (index: number, hasOpenTask: boolean) => {
   const html = renderToStaticMarkup(
     <div className="relative flex flex-col items-center scale-110">
-      <div className="bg-blue-600 p-1.5 rounded-full border-2 border-white shadow-xl text-white">
+      {/* Pulsierender Ring auch im Tour-Modus */}
+      {hasOpenTask && (
+        <div className="absolute inset-0 -m-1 w-11 h-11 animate-marker-pulse bg-yellow-400/30 rounded-full z-0" />
+      )}
+
+      <div className="relative bg-blue-600 p-1.5 rounded-full border-2 border-white shadow-xl text-white z-10">
         <MapPin size={18} fill="white" />
+        {hasOpenTask && (
+          <div className="absolute -top-1.5 -right-1.5 bg-yellow-500 text-white rounded-full p-0.5 shadow-xs border border-white">
+            <Wrench size={8} strokeWidth={3} />
+          </div>
+        )}
       </div>
-      <div className="bg-blue-700 text-white px-2 py-0.5 rounded-full text-[10px] font-black -mt-2 shadow-lg z-10 border border-white">
+
+      <div className="bg-blue-700 text-white px-2 py-0.5 rounded-full text-[10px] font-black -mt-2 shadow-lg z-20 border border-white">
         {index + 1}
       </div>
     </div>
   );
-  return L.divIcon({ html, className: 'tour-marker-icon', iconSize: [40, 40], iconAnchor: [20, 40] });
+  return L.divIcon({ html, className: 'tour-marker-icon', iconSize: [44, 44], iconAnchor: [22, 40] });
 };
 
 // --- HAUPTKOMPONENTE ---
@@ -112,6 +141,7 @@ export function TreeView({
   trees, onAddTree, tasks, onAddTask, onCompleteTask, initialSelectedId, onClearSelection,
   tour, onToggleTourTree, onReorderTour 
 }: TreeViewProps) {
+  const { showToast } = useToast();
   const [selectedTree, setSelectedTree] = useState<Tree | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
@@ -123,7 +153,6 @@ export function TreeView({
   const [mapCenter, setMapCenter] = useState({ lat: 49.4521, lng: 11.0767 });
   const [isTourMode, setIsTourMode] = useState(false);
 
-  // NEU: Logik zur Erkennung eines geplanten Tasks für das Formular
   const activeTask = useMemo(() => {
     if (!selectedTree) return undefined;
     return tasks.find(t => t.treeId === selectedTree.id && t.status === 'offen');
@@ -146,6 +175,7 @@ export function TreeView({
   const handleStartNavigation = (tree: Tree) => {
     setIsTourMode(false); 
     setRouteCoords([TEAM_POSITION, [tree.location.lat, tree.location.lng]]);
+    showToast(`Navigation zu ${tree.idNumber} gestartet`, "info");
   };
 
   const handleQuickPlan = (type: MaintenanceTask['type']) => {
@@ -159,6 +189,7 @@ export function TreeView({
       dueDate: new Date().toISOString(),
     };
     onAddTask(newTask);
+    showToast(`${type} für ${selectedTree.idNumber} geplant`, "info");
   };
 
   const filteredTrees = useMemo(() => {
@@ -214,6 +245,14 @@ export function TreeView({
       {/* TOUR MODE TOGGLE & STATUS */}
       {!isAddingMode && (
         <div className="absolute top-20 right-4 z-[500] flex flex-col gap-2">
+           <div className="flex items-center gap-2 mb-1 justify-end">
+            <span className="text-[9px] font-black text-slate-400 uppercase">Hilfe</span>
+            <InfoBox 
+              title="Tour-Modus" 
+              description="Im Tour-Modus (blau) kannst du Bäume per Klick zur Tagesroute hinzufügen. Die Route berechnet automatisch den Weg ab deinem Standort."
+              proTip="Du kannst die Reihenfolge der Stopps direkt im Baum-Detail mit den Pfeiltasten anpassen."
+            />
+          </div>
           <button 
             onClick={() => setIsTourMode(!isTourMode)}
             className={`p-4 rounded-2xl shadow-2xl transition-all border-2 active:scale-95 ${
@@ -281,11 +320,13 @@ export function TreeView({
         {filteredTrees.map((tree) => {
           const tourIndex = tour.indexOf(tree.id);
           const isInTour = tourIndex !== -1;
+          const hasOpenTask = tasks.some(t => t.treeId === tree.id && t.status === 'offen');
+
           return (
             <Marker 
               key={tree.id} 
               position={[tree.location.lat, tree.location.lng]}
-              icon={isInTour && isTourMode ? createTourIcon(tourIndex) : createCustomIcon(tree.status, tree.idNumber)}
+              icon={isInTour && isTourMode ? createTourIcon(tourIndex, hasOpenTask) : createCustomIcon(tree.status, tree.idNumber, hasOpenTask)}
               eventHandlers={{ 
                 click: () => { 
                   if (isTourMode) {
@@ -441,10 +482,11 @@ export function TreeView({
             ) : (
               <MaintenanceForm 
                 tree={selectedTree} 
-                existingTask={activeTask} // ÜBERGABE DES GEPLANTEN TASKS
+                existingTask={activeTask} 
                 onCancel={() => setIsFormOpen(false)} 
                 onSave={(newTask) => {
-                  onCompleteTask(newTask); // LOGIK-FIX: NUTZE COMPLETE STATT ADD
+                  onCompleteTask(newTask); 
+                  showToast("Maßnahme erfolgreich dokumentiert", "success");
                   setIsFormOpen(false);
                   setSelectedTree(null);
                 }} 

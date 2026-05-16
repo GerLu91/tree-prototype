@@ -35,3 +35,22 @@ body {
 .custom-popup .leaflet-popup-content {
   margin: 8px 12px;
 }
+
+@keyframes marker-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(234, 179, 8, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0);
+  }
+}
+
+/* Die Utility-Klasse */
+.animate-marker-pulse {
+  animation: marker-pulse 2s infinite ease-out;
+  border-radius: 9999px;
+  display: block;
+}

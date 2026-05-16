@@ -6,16 +6,23 @@ import { DailyLog } from "./components/features/DailyLog";
 import { TaskList } from "./components/features/TaskList";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { MOCK_TREES, MOCK_TASKS } from "./mock/data";
-import type { MaintenanceTask, Tree } from "./types";
+import type { DailyReport, MaintenanceTask, Tree } from "./types";
+import { ToastProvider, useToast } from "./components/features/ToastContext";
 
 type TabType = 'start' | 'karte' | 'protokoll' | 'aufgaben';
 
-function App() {
+/**
+ * AppContent enthält die eigentliche Logik. 
+ * Wir trennen das, damit wir innerhalb dieser Komponente den useToast Hook nutzen können.
+ */
+function AppContent() {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('start');
   
   const [trees, setTrees] = useLocalStorage<Tree[]>('arbor_trees', MOCK_TREES);
   const [tasks, setTasks] = useLocalStorage<MaintenanceTask[]>('arbor_tasks', MOCK_TASKS);
   const [tour, setTour] = useLocalStorage<string[]>('arbor_tour', []);
+  const [reports, setReports] = useLocalStorage<DailyReport[]>('arbor_reports', []);
   
   const [targetTreeId, setTargetTreeId] = useState<string | null>(null);
 
@@ -27,18 +34,17 @@ function App() {
   // 1. NEUEN BAUM ANLEGEN
   const addTree = (newTree: Tree) => {
     setTrees(prev => [...prev, newTree]);
+    showToast(`${newTree.species} erfolgreich erfasst`, "success");
   };
 
-  // 2. MASSNAHME PLANEN (Quick-Add oder Büro)
+  // 2. MASSNAHME PLANEN
   const addTask = (newTask: MaintenanceTask) => {
     setTasks(prev => [newTask, ...prev]);
-    // Der Baumstatus bleibt hier wie er ist (z.B. kritisch), 
-    // damit er auf der Karte weiterhin als "zu tun" markiert ist.
+    showToast(`Maßnahme für ${newTask.treeId.split('-')[1]} geplant`, "info");
   };
 
-  // 3. MASSNAHME ABSCHLIESSEN (Dokumentation im Feld)
+  // 3. MASSNAHME ABSCHLIESSEN
   const completeTask = (newTask: MaintenanceTask) => {
-    // Falls ein bestehender Task überschrieben wird (ID check) oder neu
     setTasks(prev => {
       const exists = prev.find(t => t.id === newTask.id);
       if (exists) {
@@ -54,10 +60,18 @@ function App() {
 
     // Aus der Tour entfernen
     setTour(prevTour => prevTour.filter(id => id !== newTask.treeId));
+    
+    showToast("Maßnahme erfolgreich dokumentiert", "success");
   };
 
   const toggleTourTree = (treeId: string) => {
-    setTour(prev => prev.includes(treeId) ? prev.filter(id => id !== treeId) : [...prev, treeId]);
+    const isInTour = tour.includes(treeId);
+    setTour(prev => isInTour ? prev.filter(id => id !== treeId) : [...prev, treeId]);
+    
+    showToast(
+      isInTour ? "Von Tour entfernt" : "Zur Tour hinzugefügt", 
+      isInTour ? "info" : "success"
+    );
   };
 
   const reorderTour = (newOrder: string[]) => setTour(newOrder);
@@ -67,6 +81,32 @@ function App() {
       localStorage.clear();
       window.location.reload();
     }
+  };
+
+  // Tageszettel abschließen und archivieren
+  const submitReport = () => {
+    const completedTasks = tasks.filter(t => t.status === 'erledigt');
+    
+    if (completedTasks.length === 0) {
+      showToast("Keine erledigten Aufgaben zum Senden", "warning");
+      return;
+    }
+
+    const totalHours = completedTasks.reduce((acc, t) => acc + parseFloat(t.duration || "0"), 0);
+    const uniqueTrees = new Set(completedTasks.map(t => t.treeId)).size;
+
+    const newReport: DailyReport = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      tasks: completedTasks,
+      totalHours,
+      treeCount: uniqueTrees
+    };
+
+    setReports(prev => [newReport, ...prev]);
+    setTasks(prev => prev.filter(t => t.status !== 'erledigt'));
+    
+    showToast("Tageszettel erfolgreich archiviert", "success");
   };
 
   return (
@@ -80,7 +120,7 @@ function App() {
           tour={tour}
         />
       )}
-      
+
       {activeTab === 'karte' && (
         <TreeView 
           trees={trees} 
@@ -97,7 +137,13 @@ function App() {
       )}
 
       {activeTab === 'protokoll' && (
-        <DailyLog tasks={tasks} trees={trees} onReset={handleReset} />
+        <DailyLog 
+          tasks={tasks} 
+          trees={trees} 
+          reports={reports}
+          onSubmitReport={submitReport}
+          onReset={handleReset} 
+        />
       )}
 
       {activeTab === 'aufgaben' && (
@@ -114,4 +160,13 @@ function App() {
   );
 }
 
-export default App;
+/**
+ * Root-Komponente mit Provider-Kapselung
+ */
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+}
