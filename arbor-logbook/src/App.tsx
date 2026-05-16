@@ -109,54 +109,72 @@ function AppContent() {
     showToast("Tageszettel erfolgreich archiviert", "success");
   };
 
-  return (
-    <MainLayout activeTab={activeTab} onTabChange={setActiveTab}>
-      {activeTab === 'start' && (
-        <Dashboard 
-          onStartTour={() => setActiveTab('aufgaben')} 
-          onSelectTree={handleSelectTree} 
-          tasks={tasks}
-          trees={trees} 
-          tour={tour}
-        />
-      )}
+return (
+    /* 
+      Wir stellen sicher, dass das MainLayout die volle dynamische Höhe (dvh) einnimmt 
+      und niemals scrollt. 
+    */
+    <div className="h-dvh w-full overflow-hidden flex flex-col">
+      <MainLayout activeTab={activeTab} onTabChange={setActiveTab}>
+        {/* 
+          Dieser Container nimmt den Restplatz ein. 
+          Für die Karte setzen wir 'overflow-hidden', damit sie nicht scrollt.
+          Die anderen Ansichten (Dashboard, Log) brauchen 'overflow-y-auto' 
+          innerhalb ihrer eigenen Dateien, um scrollbar zu sein.
+        */}
+        <div className="flex-1 relative h-full w-full overflow-hidden">
+          {activeTab === 'start' && (
+            <Dashboard 
+              onStartTour={() => setActiveTab('aufgaben')} 
+              onSelectTree={handleSelectTree} 
+              tasks={tasks}
+              trees={trees} 
+              tour={tour}
+            />
+          )}
 
-      {activeTab === 'karte' && (
-        <TreeView 
-          trees={trees} 
-          onAddTree={addTree}
-          tasks={tasks} 
-          onAddTask={addTask} 
-          onCompleteTask={completeTask}
-          tour={tour}
-          onToggleTourTree={toggleTourTree}
-          onReorderTour={reorderTour}
-          initialSelectedId={targetTreeId}
-          onClearSelection={() => setTargetTreeId(null)} 
-        />
-      )}
+          {activeTab === 'karte' && (
+            <TreeView 
+              trees={trees} 
+              onAddTree={addTree}
+              tasks={tasks} 
+              onAddTask={addTask} 
+              onCompleteTask={completeTask}
+              tour={tour}
+              onToggleTourTree={toggleTourTree}
+              onReorderTour={reorderTour}
+              initialSelectedId={targetTreeId}
+              onClearSelection={() => setTargetTreeId(null)} 
+            />
+          )}
 
-      {activeTab === 'protokoll' && (
-        <DailyLog 
-          tasks={tasks} 
-          trees={trees} 
-          reports={reports}
-          onSubmitReport={submitReport}
-          onReset={handleReset} 
-        />
-      )}
+          {activeTab === 'protokoll' && (
+            <div className="h-full overflow-y-auto"> {/* Scroll-Container für lange Listen */}
+              <DailyLog 
+                tasks={tasks} 
+                trees={trees} 
+                reports={reports}
+                onSubmitReport={submitReport}
+                onReset={handleReset} 
+              />
+            </div>
+          )}
 
-      {activeTab === 'aufgaben' && (
-        <TaskList 
-          tasks={tasks} 
-          trees={trees} 
-          onSelectTree={handleSelectTree}
-          tour={tour}
-          onReorderTour={reorderTour}
-          onToggleTourTree={toggleTourTree}
-        />
-      )}
-    </MainLayout>
+          {activeTab === 'aufgaben' && (
+            <div className="h-full overflow-y-auto"> {/* Scroll-Container für lange Listen */}
+              <TaskList 
+                tasks={tasks} 
+                trees={trees} 
+                onSelectTree={handleSelectTree}
+                tour={tour}
+                onReorderTour={reorderTour}
+                onToggleTourTree={toggleTourTree}
+              />
+            </div>
+          )}
+        </div>
+      </MainLayout>
+    </div>
   );
 }
 

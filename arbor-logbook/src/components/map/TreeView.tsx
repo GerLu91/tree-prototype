@@ -218,7 +218,7 @@ export function TreeView({
   }, [initialSelectedId, trees, onClearSelection]);
 
   return (
-    <div className="w-full h-[calc(100vh-130px)] relative border-t border-slate-200 overflow-hidden">
+    <div className="w-full h-full relative border-t border-slate-200 overflow-hidden">
       
       {/* FILTER BAR OVERLAY */}
       {!isAddingMode && (
@@ -278,7 +278,7 @@ export function TreeView({
       {!isAddingMode && !isTourMode && (
         <button 
           onClick={() => setIsAddingMode(true)}
-          className="absolute bottom-28 right-4 z-[500] bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl active:scale-95 transition-all flex items-center gap-3 border-2 border-white/20"
+          className="absolute bottom-36 right-4 z-[500] bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl active:scale-95 transition-all flex items-center gap-3 border-2 border-white/20"
         >
           <Plus size={24} strokeWidth={3} />
           <span className="text-sm font-black uppercase tracking-widest">Baum erfassen</span>
@@ -359,7 +359,7 @@ export function TreeView({
       )}
 
       {/* Legende */}
-      <div className="absolute bottom-6 left-4 right-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-2xl border border-slate-100 flex justify-between items-center z-[500]">
+      <div className="absolute bottom-20 left-4 right-4 bg-white/95 backdrop-blur-sm p-3 rounded-2xl shadow-2xl border border-slate-100 flex justify-between items-center z-[490]">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-full bg-emerald-600 shadow-sm"></span>
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Vital</span>

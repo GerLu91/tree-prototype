@@ -16,6 +16,14 @@
     --radius: 0.75rem;
   }
 }
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Verhindert das Scrollen des gesamten Bodys */
+  position: fixed; /* Fixiert die App gegen Mobile-Scrolling-Bounces */
+}
 
 /* Der Rest (body { @apply ... }) kann bleiben wie er ist */
 body {
