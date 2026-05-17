@@ -38,7 +38,7 @@ export function Dashboard({ onStartTour, onSelectTree, tasks, trees, tour }: Das
   const isDayFinished = openTasks.length === 0 && completedToday > 0;
 
   return (
-    <div className="p-4 space-y-6 max-w-md mx-auto pb-24">
+    <div className="h-full overflow-y-auto p-4 space-y-6 max-w-md mx-auto pb-32 scrollbar-hide">
       {/* HEADER */}
       <header className="flex justify-between items-end pt-2">
         <div>

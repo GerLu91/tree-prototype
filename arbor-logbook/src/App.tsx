@@ -34,13 +34,20 @@ function AppContent() {
   // 1. NEUEN BAUM ANLEGEN
   const addTree = (newTree: Tree) => {
     setTrees(prev => [...prev, newTree]);
-    showToast(`${newTree.species} erfolgreich erfasst`, "success");
+    setTimeout(() => {
+      showToast(`${newTree.species} erfolgreich erfasst`, "success");
+    }, 500);
   };
 
   // 2. MASSNAHME PLANEN
   const addTask = (newTask: MaintenanceTask) => {
     setTasks(prev => [newTask, ...prev]);
-    showToast(`Maßnahme für ${newTask.treeId.split('-')[1]} geplant`, "info");
+    setTimeout(() => {
+      showToast(
+        `${newTask.type} für ${newTask.treeId.split('-')[1]} geplant`, 
+        "info"
+      );
+    }, 800);
   };
 
   // 3. MASSNAHME ABSCHLIESSEN
@@ -61,17 +68,21 @@ function AppContent() {
     // Aus der Tour entfernen
     setTour(prevTour => prevTour.filter(id => id !== newTask.treeId));
     
-    showToast("Maßnahme erfolgreich dokumentiert", "success");
+     setTimeout(() => {
+      showToast("Maßnahme erfolgreich dokumentiert", "success");
+    }, 600);
   };
 
   const toggleTourTree = (treeId: string) => {
     const isInTour = tour.includes(treeId);
     setTour(prev => isInTour ? prev.filter(id => id !== treeId) : [...prev, treeId]);
     
-    showToast(
-      isInTour ? "Von Tour entfernt" : "Zur Tour hinzugefügt", 
-      isInTour ? "info" : "success"
-    );
+     setTimeout(() => {
+      showToast(
+        isInTour ? "Von Tour entfernt" : "Zur Tour hinzugefügt", 
+        isInTour ? "info" : "success"
+      );
+    }, 400);
   };
 
   const reorderTour = (newOrder: string[]) => setTour(newOrder);

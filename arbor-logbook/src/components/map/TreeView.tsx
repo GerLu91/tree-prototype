@@ -15,7 +15,7 @@ import { MaintenanceForm } from '@/components/forms/MaintenanceForm';
 import { AddTreeForm } from '@/components/forms/AddTreeForm';
 import type { MaintenanceTask, Tree } from '@/types';
 
-// Asset Handling für Leaflet mit Vite Suffix ?url (Wichtig für Build-Check)
+// Asset Handling für Leaflet mit Vite Suffix ?url
 import markerIcon from 'leaflet/dist/images/marker-icon.png?url';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png?url';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png?url';
@@ -66,22 +66,19 @@ function MapCenterTracker({ onCenterChange }: { onCenterChange: (coords: {lat: n
   return null;
 }
 
-// --- ICON GENERATOREN (VEREDELT) ---
+// --- ICON GENERATOREN ---
 
 const createCustomIcon = (status: string, idNumber: string, hasOpenTask: boolean) => {
   const color = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#059669';
   
   const html = renderToStaticMarkup(
     <div className="relative flex flex-col items-center">
-      {/* Pulsierender Ring bei offenen Aufgaben (Smart Marker) */}
       {hasOpenTask && (
         <div className="absolute inset-0 -m-1 w-11 h-11 animate-marker-pulse bg-yellow-500/20 rounded-full z-0" />
       )}
       
       <div style={{ backgroundColor: color }} className="relative p-1.5 rounded-full border-2 border-white shadow-xl text-white z-10">
         <MapPin size={18} />
-        
-        {/* Kleines Werkzeug-Badge am Marker */}
         {hasOpenTask && (
           <div className="absolute -top-1.5 -right-1.5 bg-white text-yellow-600 rounded-full p-0.5 shadow-xs border border-yellow-200">
             <Wrench size={8} strokeWidth={3} />
@@ -100,11 +97,9 @@ const createCustomIcon = (status: string, idNumber: string, hasOpenTask: boolean
 const createTourIcon = (index: number, hasOpenTask: boolean) => {
   const html = renderToStaticMarkup(
     <div className="relative flex flex-col items-center scale-110">
-      {/* Pulsierender Ring auch im Tour-Modus */}
       {hasOpenTask && (
         <div className="absolute inset-0 -m-1 w-11 h-11 animate-marker-pulse bg-yellow-400/30 rounded-full z-0" />
       )}
-
       <div className="relative bg-blue-600 p-1.5 rounded-full border-2 border-white shadow-xl text-white z-10">
         <MapPin size={18} fill="white" />
         {hasOpenTask && (
@@ -113,7 +108,6 @@ const createTourIcon = (index: number, hasOpenTask: boolean) => {
           </div>
         )}
       </div>
-
       <div className="bg-blue-700 text-white px-2 py-0.5 rounded-full text-[10px] font-black -mt-2 shadow-lg z-20 border border-white">
         {index + 1}
       </div>
@@ -147,7 +141,6 @@ export function TreeView({
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>('all');
   
-  // States für Ad-hoc Erfassung
   const [isAddingMode, setIsAddingMode] = useState(false);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 49.4521, lng: 11.0767 });
@@ -189,7 +182,7 @@ export function TreeView({
       dueDate: new Date().toISOString(),
     };
     onAddTask(newTask);
-    showToast(`${type} für ${selectedTree.idNumber} geplant`, "info");
+    /* showToast(`${type} für ${selectedTree.idNumber} geplant`, "info"); */
   };
 
   const filteredTrees = useMemo(() => {
@@ -312,7 +305,6 @@ export function TreeView({
 
       <MapContainer center={TEAM_POSITION} zoom={16} style={{ width: '100%', height: '100%' }} zoomControl={false}>
         <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-
         {isAddingMode && <MapCenterTracker onCenterChange={setMapCenter} />}
         {activeFilter !== 'all' && <MapBoundsHandler trees={filteredTrees} />}
         {selectedTree && <MapFocusHandler target={[selectedTree.location.lat, selectedTree.location.lng]} />}
@@ -469,14 +461,43 @@ export function TreeView({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-5 gap-2 pt-2">
-                  <Button variant="outline" className="col-span-2 h-14 rounded-2xl border-slate-200 flex flex-col gap-1 items-center justify-center group text-slate-900" onClick={() => handleStartNavigation(selectedTree)}>
-                    <Navigation size={18} className="text-blue-600 group-active:scale-110 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-tighter">Anfahrt</span>
-                  </Button>
-                  <Button className="col-span-3 h-14 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/20 bg-emerald-600" onClick={() => setIsFormOpen(true)}>
-                    {activeTask ? 'Maßnahme fortführen' : 'Maßnahme starten'}
-                  </Button>
+                {/* NAVIGATION HINWEIS & BUTTONS */}
+                <div className="space-y-4 pt-2">
+                  {routeCoords && (
+                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center gap-3 animate-in fade-in zoom-in-95 transition-all">
+                      <div className="bg-blue-600 p-2 rounded-lg text-white animate-pulse">
+                        <Navigation size={16} fill="currentColor" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-black text-blue-700 uppercase tracking-tight">Navigation läuft</p>
+                        <p className="text-[10px] text-blue-600 font-medium">Schließe dieses Fenster, um der Route auf der Karte zu folgen.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-5 gap-2">
+                    <Button 
+                      variant="outline" 
+                      className={`col-span-2 h-14 rounded-2xl flex flex-col gap-1 items-center justify-center group transition-all ${
+                        routeCoords ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-200' : 'border-slate-200'
+                      }`} 
+                      onClick={() => handleStartNavigation(selectedTree)}
+                    >
+                      <Navigation 
+                        size={18} 
+                        className={`${routeCoords ? 'text-blue-600 animate-pulse' : 'text-slate-400'} transition-colors`} 
+                      />
+                      <span className={`text-[10px] font-black uppercase tracking-tighter ${routeCoords ? 'text-blue-700' : 'text-slate-900'}`}>
+                        {routeCoords ? 'Aktiv' : 'Anfahrt'}
+                      </span>
+                    </Button>
+                    <Button 
+                      className="col-span-3 h-14 rounded-2xl text-xs sm:text-sm font-black uppercase tracking-normal sm:tracking-widest shadow-xl shadow-primary/20 bg-emerald-600 px-2" 
+                      onClick={() => setIsFormOpen(true)}
+                    >
+                      {activeTask ? 'Maßnahme fortführen' : 'Maßnahme starten'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -486,7 +507,7 @@ export function TreeView({
                 onCancel={() => setIsFormOpen(false)} 
                 onSave={(newTask) => {
                   onCompleteTask(newTask); 
-                  showToast("Maßnahme erfolgreich dokumentiert", "success");
+                  /* showToast("Maßnahme erfolgreich dokumentiert", "success"); */
                   setIsFormOpen(false);
                   setSelectedTree(null);
                 }} 
